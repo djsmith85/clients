@@ -53,6 +53,17 @@ jobs:
           monorepo: true
           monorepo-project: cli
 
+      - name: Get version info from run logs and set release tag name
+        id: get_release_info
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ARTIFACT_RUN_ID: ${{ inputs.artifact-run-id }}
+          _APP_NAME_SUFFIX: cli-v
+        run: |
+          last_release_tag=$(git tag -l --sort=-authordate | grep "$_APP_NAME_SUFFIX" | head -n 1)
+          echo "🔖 Last release tag: $last_release_tag"
+          echo "last_release_tag=$last_release_tag" >> "$GITHUB_OUTPUT"
+
   release:
     name: Release
     runs-on: ubuntu-22.04
@@ -78,28 +89,71 @@ jobs:
           workflow_conclusion: success
           branch: main
 
-      - name: Create release
+      # - name: Create release
+      #   if: ${{ inputs.release_type != 'Dry Run' }}
+      #   uses: ncipollo/release-action@b7eabc95ff50cbeeedec83973935c8f306dfcd0b # v1.20.0
+      #   env:
+      #     PKG_VERSION: ${{ needs.setup.outputs.release_version }}
+      #   with:
+      #     artifacts: "apps/cli/bw-oss-windows-${{ env.PKG_VERSION }}.zip,
+      #                 apps/cli/bw-windows-${{ env.PKG_VERSION }}.zip,
+      #                 apps/cli/bw-oss-macos-${{ env.PKG_VERSION }}.zip,
+      #                 apps/cli/bw-oss-macos-arm64-${{ env.PKG_VERSION }}.zip,
+      #                 apps/cli/bw-macos-${{ env.PKG_VERSION }}.zip,
+      #                 apps/cli/bw-macos-arm64-${{ env.PKG_VERSION }}.zip,
+      #                 apps/cli/bw-oss-linux-${{ env.PKG_VERSION }}.zip,
+      #                 apps/cli/bw-oss-linux-arm64-${{ env.PKG_VERSION }}.zip,
+      #                 apps/cli/bw-linux-${{ env.PKG_VERSION }}.zip,
+      #                 apps/cli/bw-linux-arm64-${{ env.PKG_VERSION }}.zip,
+      #                 apps/cli/bitwarden-cli.${{ env.PKG_VERSION }}.nupkg,
+      #                 apps/cli/bw_${{ env.PKG_VERSION }}_amd64.snap,
+      #                 apps/cli/bitwarden-cli-${{ env.PKG_VERSION }}-npm-build.zip"
+      #     commit: ${{ github.sha }}
+      #     tag: cli-v${{ env.PKG_VERSION }}
+      #     name: CLI v${{ env.PKG_VERSION }}
+      #     body: "<insert release notes here>"
+      #     token: ${{ secrets.GITHUB_TOKEN }}
+      #     draft: true
+
+      - name: Create Release
+        id: create_release
         if: ${{ inputs.release_type != 'Dry Run' }}
-        uses: ncipollo/release-action@b7eabc95ff50cbeeedec83973935c8f306dfcd0b # v1.20.0
         env:
           PKG_VERSION: ${{ needs.setup.outputs.release_version }}
-        with:
-          artifacts: "apps/cli/bw-oss-windows-${{ env.PKG_VERSION }}.zip,
-                      apps/cli/bw-windows-${{ env.PKG_VERSION }}.zip,
-                      apps/cli/bw-oss-macos-${{ env.PKG_VERSION }}.zip,
-                      apps/cli/bw-oss-macos-arm64-${{ env.PKG_VERSION }}.zip,
-                      apps/cli/bw-macos-${{ env.PKG_VERSION }}.zip,
-                      apps/cli/bw-macos-arm64-${{ env.PKG_VERSION }}.zip,
-                      apps/cli/bw-oss-linux-${{ env.PKG_VERSION }}.zip,
-                      apps/cli/bw-oss-linux-arm64-${{ env.PKG_VERSION }}.zip,
-                      apps/cli/bw-linux-${{ env.PKG_VERSION }}.zip,
-                      apps/cli/bw-linux-arm64-${{ env.PKG_VERSION }}.zip,
-                      apps/cli/bitwarden-cli.${{ env.PKG_VERSION }}.nupkg,
-                      apps/cli/bw_${{ env.PKG_VERSION }}_amd64.snap,
-                      apps/cli/bitwarden-cli-${{ env.PKG_VERSION }}-npm-build.zip"
-          commit: ${{ github.sha }}
-          tag: cli-v${{ env.PKG_VERSION }}
-          name: CLI v${{ env.PKG_VERSION }}
-          body: "<insert release notes here>"
-          token: ${{ secrets.GITHUB_TOKEN }}
-          draft: true
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          _APP_NAME: CLI
+          _VERSION_NAME: ${{ env.PKG_VERSION }}
+          # _VERSION_NUMBER: ${{ env.PKG_VERSION }}
+          _TARGET_COMMIT: ${{ github.sha }}
+          _TAG_NAME: cli-v${{ env.PKG_VERSION }}
+          _LAST_RELEASE_TAG: ${{ steps.get_release_info.outputs.last_release_tag }}
+        run: |
+          # echo "⌛️ Creating release for $_APP_NAME $_VERSION_NAME ($_VERSION_NUMBER) on $_TARGET_COMMIT"
+          echo "⌛️ Creating release for $_APP_NAME $_VERSION_NAME on $_TARGET_COMMIT"
+          release_url=$(gh release create "$_TAG_NAME" \
+            --title "$_APP_NAME $_VERSION_NAME" \
+            --target "$_TARGET_COMMIT" \
+            --generate-notes \
+            --notes-start-tag "$_LAST_RELEASE_TAG" \
+            --draft \
+            "apps/cli/bw-oss-windows-${{ env.PKG_VERSION }}.zip,
+            apps/cli/bw-windows-${{ env.PKG_VERSION }}.zip,
+            apps/cli/bw-oss-macos-${{ env.PKG_VERSION }}.zip,
+            apps/cli/bw-oss-macos-arm64-${{ env.PKG_VERSION }}.zip,
+            apps/cli/bw-macos-${{ env.PKG_VERSION }}.zip,
+            apps/cli/bw-macos-arm64-${{ env.PKG_VERSION }}.zip,
+            apps/cli/bw-oss-linux-${{ env.PKG_VERSION }}.zip,
+            apps/cli/bw-oss-linux-arm64-${{ env.PKG_VERSION }}.zip,
+            apps/cli/bw-linux-${{ env.PKG_VERSION }}.zip,
+            apps/cli/bw-linux-arm64-${{ env.PKG_VERSION }}.zip,
+            apps/cli/bitwarden-cli.${{ env.PKG_VERSION }}.nupkg,
+            apps/cli/bw_${{ env.PKG_VERSION }}_amd64.snap,
+            apps/cli/bitwarden-cli-${{ env.PKG_VERSION }}-npm-build.zip")
+
+          # Extract release tag from URL
+          release_id_from_url=$(echo "$release_url" | sed 's/.*\/tag\///')
+          echo "release_id_from_url=$release_id_from_url" >> "$GITHUB_OUTPUT"
+          echo "url=$release_url" >> "$GITHUB_OUTPUT"
+
+          echo "✅ Release created: $release_url"
+          echo "🔖 Release ID from URL: $release_id_from_url"
