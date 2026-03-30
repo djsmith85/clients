@@ -10,7 +10,7 @@
 
 ---
 
-TEST TEST RC2
+TEST TEST RC3
 
 # Bitwarden Client Applications
 
