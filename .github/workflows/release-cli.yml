@@ -83,6 +83,7 @@ jobs:
         uses: ncipollo/release-action@b7eabc95ff50cbeeedec83973935c8f306dfcd0b # v1.20.0
         env:
           PKG_VERSION: ${{ needs.setup.outputs.release_version }}
+          LAST_RELEASE_TAG: ${{ steps.get_release_info.outputs.last_release_tag }}
         with:
           artifacts: "apps/cli/bw-oss-windows-${{ env.PKG_VERSION }}.zip,
                       apps/cli/bw-windows-${{ env.PKG_VERSION }}.zip,
@@ -103,3 +104,5 @@ jobs:
           body: "<insert release notes here>"
           token: ${{ secrets.GITHUB_TOKEN }}
           draft: true
+          generateReleaseNotes: true
+          generateReleaseNotesPreviousTag: ${{ env.LAST_RELEASE_TAG }}
