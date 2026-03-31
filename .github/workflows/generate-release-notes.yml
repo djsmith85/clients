@@ -39,7 +39,7 @@ jobs:
           set -euo pipefail
 
           # Parse .github/release.yml into JSON for use by jq
-          RELEASE_CONFIG=$(yq -o=json '.changelog' /.github/release.yml)
+          RELEASE_CONFIG=$(yq -o=json '.changelog' ../release.yml)
 
           echo "Using release config:"
           echo "$RELEASE_CONFIG" | jq .
