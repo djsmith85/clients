@@ -1,0 +1,17 @@
+changelog:
+  exclude:
+    labels:
+      - ignore-for-release
+  categories:
+    - title: "💙 Community Highlight"
+      labels:
+        - community-pr
+    - title: "🐛 Bug fixes"
+      labels:
+        - bug
+    - title: "📦 Dependency Updates"
+      labels:
+        - major-updates
+    - title: "🎨 Other"
+      labels:
+        - "*"
