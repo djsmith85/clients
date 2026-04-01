@@ -59,7 +59,14 @@ jobs:
     needs: setup
     permissions:
       contents: write
+      pull-requests: read
     steps:
+      - name: Checkout repo
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
       - name: Download all Release artifacts
         if: ${{ inputs.release_type != 'Dry Run' }}
         uses: bitwarden/gh-actions/download-artifacts@main
@@ -78,12 +85,33 @@ jobs:
           workflow_conclusion: success
           branch: main
 
+      - name: Generate release notes
+        working-directory: .
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "Generating release notes..."
+          # capture output and exit code so this step continues even if we can't generate release notes.
+          script_exit_code=0
+          release_notes=$(./.github/scripts/generate-release-notes.sh "cli") || script_exit_code=$?
+          echo "--------------------------------"
+
+          if [[ $script_exit_code -ne 0 || -z "$release_notes" ]]; then
+            echo "Script Output: $release_notes"
+            echo "::warning::Failed to generate release notes. Check script logs for more details."
+            release_notes="<insert release notes here>"
+          else
+            echo "✅ Release notes:"
+            echo "$release_notes"
+          fi
+
+          echo "$release_notes" > release_notes.txt
+
       - name: Create release
         if: ${{ inputs.release_type != 'Dry Run' }}
         uses: ncipollo/release-action@b7eabc95ff50cbeeedec83973935c8f306dfcd0b # v1.20.0
         env:
           PKG_VERSION: ${{ needs.setup.outputs.release_version }}
-          LAST_RELEASE_TAG: ${{ steps.get_release_info.outputs.last_release_tag }}
         with:
           artifacts: "apps/cli/bw-oss-windows-${{ env.PKG_VERSION }}.zip,
                       apps/cli/bw-windows-${{ env.PKG_VERSION }}.zip,
@@ -101,8 +129,6 @@ jobs:
           commit: ${{ github.sha }}
           tag: cli-v${{ env.PKG_VERSION }}
           name: CLI v${{ env.PKG_VERSION }}
-          body: "<insert release notes here>"
+          bodyFile: release_notes.txt
           token: ${{ secrets.GITHUB_TOKEN }}
           draft: true
-          generateReleaseNotes: true
-          generateReleaseNotesPreviousTag: ${{ env.LAST_RELEASE_TAG }}
