@@ -1,19 +1,23 @@
 #!/usr/bin/env bash
 # Generates per-client release notes by filtering merged PRs by client label.
-# Usage: ./generate-release-notes.sh <client>
-# Example: ./generate-release-notes.sh web
+# Usage: ./generate-release-notes.sh <client> <release_config>
+# Example: ./generate-release-notes.sh web ../release.yml
 #
-# Must be run from the repository root.
 # Requirements: gh (authenticated), jq, yq, git (with tags fetched)
 
 set -euo pipefail
 
 CLIENT="${1:?Usage: $0 <client> (web, browser, desktop, cli)}"
-GH_REPO="${GH_REPO:-bitwarden/clients}"
+
+# Internal variables that can be overridden for testing
+GH_REPO="bitwarden/clients"
 RELEASE_CONFIG_PATH=".github/release.yml"
 
 # Parse .github/release.yml into JSON for use by jq
-RELEASE_CONFIG=$(yq -o=json '.changelog' "$RELEASE_CONFIG_PATH")
+RELEASE_CONFIG=$(yq -o=json '.changelog' "$RELEASE_CONFIG_PATH") || {
+  echo "Error: Failed to parse release config from $RELEASE_CONFIG_PATH" >&2
+  exit 1
+}
 
 # Find the most recent tag for this client
 PREV_TAG=$(git tag -l --sort=-authordate | grep "^${CLIENT}-v" | head -n 1)
@@ -36,7 +40,10 @@ PRS=$(gh pr list \
   --label "$CLIENT" \
   --search "merged:>=${PREV_DATE}" \
   --json number,title,labels,author \
-  --limit 500)
+  --limit 500 2>&1) || {
+  echo "Error: Failed to fetch PRs from GitHub: $PRS" >&2
+  exit 1
+}
 
 # Filter and categorize PRs using the release.yml config
 MARKDOWN=$(jq -r -n \
